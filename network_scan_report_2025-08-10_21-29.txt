@@ -1,0 +1,36 @@
+******************************************
+         Security Scan Report     
+******************************************
+
+Entered IP: scanme.nmap.org
+
+=========================================
+Open Ports and Services
+=========================================
+No open ports detected.
+
+=========================================
+Potential Vulnerabilities Identified
+=========================================
+[*] Initiating vulnerability scan on scanme.nmap.org ...
+[*] This may take several minutes depending on host responsiveness.
+[-] No Vulnerabilities found.
+
+--- Analyzing Service Versions for Known Risks ---
+
+[*] Vulnerability analysis complete.
+=========================================
+Remediation Actions Required
+=========================================
+1. Disable or secure Telnet.
+2. Ensure SSH services are configured securely.
+3. Apply security patches for services and restrict access to ports.
+4. Disable Teamspeak.
+5. Patch all services/applications to latest versions.
+6. Scan database/sanitize all databases.
+7. Regularly monitor logs and establish detection system/process.
+
+******************************************
+Report completed
+Generated on: 2025-08-10_21-29
+******************************************

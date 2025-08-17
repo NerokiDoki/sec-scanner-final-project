@@ -1,0 +1,43 @@
+******************************************
+         Security Scan Report     
+******************************************
+
+Entered IP: 127.0.0.1
+
+=========================================
+Open Ports and Services
+=========================================
+22/tcp   open  ssh     OpenSSH 7.6p1 Ubuntu 4ubuntu0.5 (Ubuntu Linux; protocol 2.0)
+3000/tcp open  ppp?
+5900/tcp open  vnc     VNC (protocol 3.8)
+
+=========================================
+Targeted Vulnerabilities Identified
+=========================================
+[*] Initiating targeted vulnerability scan on 127.0.0.1 ...
+[*] This may take several minutes depending on host responsiveness.
+[+] Found the following targeted services:
+22/tcp   open  ssh     OpenSSH 7.6p1 Ubuntu 4ubuntu0.5 (Ubuntu Linux; protocol 2.0)
+
+--- Querying NVD for Targeted Services ---
+[*] Checking 7.6p1 Ubuntu for known vulnerabilities...
+
+>>> Querying NVD for vulnerabilities in: 7.6p1 Ubuntu
+  [+] No vulnerabilities found in NVD for this service.
+
+[*] Vulnerability analysis complete.
+=========================================
+Remediation Actions Required
+=========================================
+1. Disable or secure Telnet.
+2. Ensure SSH services are configured securely.
+3. Apply security patches for services and restrict access to ports.
+4. Disable Teamspeak.
+5. Patch all services/applications to latest versions.
+6. Scan database/sanitize all databases.
+7. Regularly monitor logs and establish detection system/process.
+
+******************************************
+Report completed
+Generated on: 2025-08-17_21-33
+******************************************

@@ -20,8 +20,6 @@ write_ports_section() {
     echo "========================================="
 
     # Run a service/version detection scan with nmap
-    # Pipe output to grep to extract lines indicating open ports only
-    # This enables focused reporting on relevant, active services
     nmap -sV "$TARGET" 2>/dev/null | grep -E "^[0-9]+/tcp\s+(open)" || echo "No open ports detected."
     
     echo ""
@@ -31,53 +29,80 @@ write_ports_section() {
 write_vulns_section() {
     local TARGET=$entered_IP
     echo "========================================="
-    echo "Potential Vulnerabilities Identified"
+    echo "Targeted Vulnerabilities Identified"
     echo "========================================="
 
-    echo "[*] Initiating vulnerability scan on $TARGET ..."
+    echo "[*] Initiating targeted vulnerability scan on $TARGET ..."
     echo "[*] This may take several minutes depending on host responsiveness."
 
+    # Run Nmap scan with vuln scripts
     local SCAN_RESULTS
     SCAN_RESULTS=$(nmap -sV --script vuln "$TARGET" 2>/dev/null)
 
-    
-    # Vulnerability Results
-    local VULN_MATCHES
-    VULN_MATCHES=$(echo "$SCAN_RESULTS" | grep -i "VULNERABLE")
+    # Filter for targeted services: Apache, OpenSSH, Nginx
+    local FILTERED_RESULTS
+    FILTERED_RESULTS=$(echo "$SCAN_RESULTS" | grep -E "Apache httpd|OpenSSH|nginx")
 
-    if [[ -n "$VULN_MATCHES" ]]; then
-        echo "[+] Found Vulnerabilities:"
-        echo "$VULN_MATCHES"
+    if [[ -n "$FILTERED_RESULTS" ]]; then
+        echo "[+] Found the following targeted services:"
+        echo "$FILTERED_RESULTS"
     else
-        echo "[-] No Vulnerabilities found."
+        echo "[-] No targeted services detected (Apache, OpenSSH, Nginx)."
     fi
 
     echo ""
-    echo "--- Analyzing Service Versions for Known Risks ---"
+    echo "--- Querying NVD for Targeted Services ---"
 
-    
-    # Scan of Vulnerabilities
-    echo "$SCAN_RESULTS" | while read -r line; do
-        case "$line" in
-            *"vsftpd 2.3.4"*)
-                echo "[!!] CRITICAL: vsftpd 2.3.4 detected — known backdoor vulnerability (CVE-2011-2523)."
-                ;;
-            *"Apache httpd 2.4.49"*)
-                echo "[!!] HIGH: Apache 2.4.49 detected — vulnerable to path traversal and RCE (CVE-2021-41773)."
-                ;;
-            *"OpenSSL 1.0.1"*)
-                echo "[!!] HIGH: OpenSSL 1.0.1 detected — vulnerable to Heartbleed (CVE-2014-0160)."
-                ;;
-            *"Samba 3.5.0"*)
-                echo "[!!] HIGH: Samba 3.5.0 detected — vulnerable to remote code execution (CVE-2012-1182)."
-                ;;
-        esac
+    # Loop through the filtered services to query NVD
+    echo "$FILTERED_RESULTS" | while read -r port proto state service rest; do
+        product_name=$(echo "$rest" | awk '{print $1}')
+        product_version=$(echo "$rest" | awk '{print $2}')
+
+        if [[ -n "$product_name" && -n "$product_version" ]]; then
+            echo "[*] Checking $product_name $product_version for known vulnerabilities..."
+            query_nvd "$product_name" "$product_version"
+        else
+            echo "[-] Could not determine version for service: $service"
+        fi
     done
 
     echo ""
     echo "[*] Vulnerability analysis complete."
 }
 
+# NVD API quary
+query_nvd() {
+        local product="$1"
+    local version="$2"
+    local results_limit=3
+
+    echo ""
+    echo ">>> Querying NVD for vulnerabilities in: $product $version"
+
+    local search_query
+    search_query=$(echo "$product $version" | sed 's/ /%20/g')
+    local nvd_api_url="https://services.nvd.nist.gov/rest/json/cves/2.0?keywordSearch=${search_query}&resultsPerPage=${results_limit}"
+
+    local vulnerabilities_json
+    vulnerabilities_json=$(curl -s "$nvd_api_url")
+
+    if [[ -z "$vulnerabilities_json" ]]; then
+        echo "  [!] Error: Failed to fetch data from NVD."
+        return
+    fi
+    if echo "$vulnerabilities_json" | jq -e '.message' > /dev/null; then
+        echo "  [!] NVD API Error: $(echo "$vulnerabilities_json" | jq -r '.message')"
+        return
+    fi
+    if ! echo "$vulnerabilities_json" | jq -e '.vulnerabilities[0]' > /dev/null; then
+        echo "  [+] No vulnerabilities found in NVD for this service."
+        return
+    fi
+
+    echo "$vulnerabilities_json" | jq -r \
+        '.vulnerabilities[] |
+        "  CVE ID: \(.cve.id)\n  Description: \((.cve.descriptions[] | select(.lang==\"en\")).value | gsub("\n"; " "))\n  Severity: \(.cve.metrics.cvssMetricV31[0].cvssData.baseSeverity // .cve.metrics.cvssMetricV2[0].cvssData.baseSeverity // "N/A")\n---"'
+}
 
 # Recommendations
 write_recs_section() {
@@ -114,7 +139,7 @@ main() {
     fi
 
     if [ $# -gt 1 ]; then
-    echo "Error: Too many arguments provided."
+    echo "Error: Too many IPs or Domains entered only use one IP or one domain."
     echo "Usage: $0 <target_ip_or_domain>"
     exit 1
     fi
@@ -144,11 +169,11 @@ main() {
 
     # Report generation
     #writes out sections for the report
-    write_header "$entered_IP" > "$REPORT_FILE"
-    write_ports_section >> "$REPORT_FILE" 
-    write_vulns_section >> "$REPORT_FILE"
-    write_recs_section >> "$REPORT_FILE"
-    write_footer >> "$REPORT_FILE"
+    write_header "$entered_IP"   | tee    "$REPORT_FILE"
+    write_ports_section          | tee -a "$REPORT_FILE"
+    write_vulns_section          | tee -a "$REPORT_FILE"
+    write_recs_section           | tee -a "$REPORT_FILE"
+    write_footer                 | tee -a "$REPORT_FILE"
 
     # Report gen message
     echo "+++++++++++++++++++++++++++++++++++++++++++"
